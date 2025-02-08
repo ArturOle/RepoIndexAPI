@@ -5,7 +5,6 @@ import (
     "log"
 
     "cloud.google.com/go/bigquery"
-    "google.golang.org/api/option"
 )
 
 var BQClient *bigquery.Client
@@ -13,7 +12,7 @@ var BQClient *bigquery.Client
 func InitBigQuery() error {
     ctx := context.Background()
     var err error
-    BQClient, err = bigquery.NewClient(ctx, "repos-450312", option.WithCredentialsFile("path/to/your/service-account-file.json"))
+    BQClient, err = bigquery.NewClient(ctx, "repos-450312")
     if err != nil {
         return err
     }
@@ -31,7 +30,7 @@ func ReinitBigQuery() {
     ctx := context.Background()
     var err error
 
-    BQClient, err = bigquery.NewClient(ctx, "repos-450312", option.WithCredentialsFile("path/to/your/service-account-file.json"))
+    BQClient, err = bigquery.NewClient(ctx, "repos-450312")
     if err != nil {
         log.Fatal("Failed to connect to BigQuery:", err)
     }

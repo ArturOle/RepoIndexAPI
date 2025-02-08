@@ -2,7 +2,7 @@ package api
 
 import (
     "context"
-    "saucer_api/config"
+    "repo_api/config"
     "cloud.google.com/go/bigquery"
     "google.golang.org/api/iterator"
 )
@@ -10,7 +10,6 @@ import (
 func GetRepositories(limit int) ([]config.Repository, error) {
     ctx := context.Background()
 
-    // Construct the query to fetch repositories with a limit
     query := config.BQClient.Query(
         `SELECT ID, Name, Stars, URL, Description
         FROM ` + "`repos-450312.repositories.repos`" + `
@@ -20,7 +19,6 @@ func GetRepositories(limit int) ([]config.Repository, error) {
         {Name: "limit", Value: limit},
     }
 
-    // Execute the query
     it, err := query.Read(ctx)
     if err != nil {
         return nil, err

@@ -6,7 +6,6 @@ import (
     "google.golang.org/api/iterator"
 )
 
-// Insert a repository into BigQuery
 func InsertRepositoryToBigQuery(ctx context.Context, repo Repository) error {
     inserter := BQClient.Dataset("repositories").Table("repos").Inserter()
     if err := inserter.Put(ctx, repo); err != nil {
@@ -15,7 +14,6 @@ func InsertRepositoryToBigQuery(ctx context.Context, repo Repository) error {
     return nil
 }
 
-// Fetch repositories from BigQuery
 func FetchRepositoriesFromBigQuery(ctx context.Context) ([]Repository, error) {
     query := BQClient.Query("SELECT * FROM `repos-450312.repositories.repos`")
     it, err := query.Read(ctx)

@@ -1,43 +1,82 @@
 package api
 
 import (
-    "net/http"
+    "os"
     "strconv"
 
-    "github.com/gin-gonic/gin"
+    "encoding/csv"
+    "encoding/json"
+    "log"
+    "net/http"
+    "repo_api/config"
+    "context"
 )
 
-func SetupRouter() *gin.Engine {
-    r := gin.Default()
+func StoreRepositories() {
+    resp, err := http.Get(config.GITHUB_API)
+    if err != nil {
+        log.Println("Failed to fetch GitHub repositories:", err)
+        return
+    }
+    defer resp.Body.Close()
 
-    r.GET("/api/fetch-repositories", func(c *gin.Context) {
-        go func() {
-            StoreRepositories()
-        }()
-        c.JSON(http.StatusOK, gin.H{"message": "Repositories update started!"})
-    })
+    data, err := decodeResponse(resp)
+    if err != nil {
+        log.Println("Failed to decode response:", err)
+        return
+    }
 
-    r.GET("/api/repositories", func(c *gin.Context) {
-        limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
-        reposChan := make(chan []config.Repository)
-        errChan := make(chan error)
+    if err := saveToCSV(data.Items); err != nil {
+        log.Println("Failed to save to CSV:", err)
+    }
 
-        go func() {
-            repos, err := GetRepositories(limit)
-            if err != nil {
-                errChan <- err
-                return
-            }
-            reposChan <- repos
-        }()
+    if err := updateBigQuery(data.Items); err != nil {
+        log.Println("Failed to update BigQuery:", err)
+    }
+}
 
-        select {
-        case repos := <-reposChan:
-            c.JSON(http.StatusOK, repos)
-        case err := <-errChan:
-            c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+func decodeResponse(resp *http.Response) (*struct {
+    Items []config.Repository `json:"items"`
+}, error) {
+    var data struct {
+        Items []config.Repository `json:"items"`
+    }
+    if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
+        return nil, err
+    }
+    return &data, nil
+}
+
+func saveToCSV(repos []config.Repository) error {
+    csvFile, err := os.Create("repositories.csv")
+    if err != nil {
+        return err
+    }
+    defer csvFile.Close()
+
+    writer := csv.NewWriter(csvFile)
+    defer writer.Flush()
+
+    writer.Write([]string{"id", "Name", "Stars", "URL"})
+
+    for _, repo := range repos {
+        writer.Write([]string{
+            strconv.Itoa(int(repo.ID)),
+            repo.Name,
+            strconv.Itoa(int(repo.Stars)),
+            repo.URL,
+        })
+    }
+
+    return nil
+}
+
+func updateBigQuery(repos []config.Repository) error {
+    ctx := context.Background()
+    for _, repo := range repos {
+        if err := config.InsertRepositoryToBigQuery(ctx, repo); err != nil {
+            return err
         }
-    })
-
-    return r
+    }
+    return nil
 }

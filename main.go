@@ -4,21 +4,19 @@ import (
     "log"
     "time"
 
-    "saucer_api/config"
-    "saucer_api/api"
+    "repo_api/config"
+    "repo_api/api"
 )
 
 func main() {
-    // Catch any unexpected panic.
     defer func() {
         if r := recover(); r != nil {
             log.Printf("Recovered from panic: %v", r)
             time.Sleep(5 * time.Second)
-            main() // Restart the main function.
+            main()
         }
     }()
 
-    // Expected errors are handled here.
     if err := config.InitBigQuery(); err != nil {
         log.Fatalf("Failed to initialize BigQuery: %v", err)
     }
