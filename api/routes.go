@@ -12,9 +12,9 @@ func SetupRouter() *gin.Engine {
     r := gin.Default()
 
     r.GET("/api/fetch-repositories", func(c *gin.Context) {
-        go func() {
-            StoreRepositories()
-        }()
+
+        StoreRepositories()
+
         c.JSON(http.StatusOK, gin.H{"message": "Repositories update started!"})
     })
 

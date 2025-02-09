@@ -1,15 +1,16 @@
 package api
 
 import (
-    "os"
-    "strconv"
-
+    "context"
     "encoding/csv"
     "encoding/json"
     "log"
     "net/http"
+    "os"
+    "strconv"
+    "time"
+
     "repo_api/config"
-    "context"
 )
 
 func StoreRepositories() {
@@ -20,31 +21,29 @@ func StoreRepositories() {
     }
     defer resp.Body.Close()
 
-    data, err := decodeResponse(resp)
+    repos, err := decodeResponse(resp)
     if err != nil {
         log.Println("Failed to decode response:", err)
         return
     }
 
-    if err := saveToCSV(data.Items); err != nil {
+    if err := saveToCSV(repos); err != nil {
         log.Println("Failed to save to CSV:", err)
     }
 
-    if err := updateBigQuery(data.Items); err != nil {
+    if err := updateBigQuery(repos); err != nil {
         log.Println("Failed to update BigQuery:", err)
     }
 }
 
-func decodeResponse(resp *http.Response) (*struct {
-    Items []config.Repository `json:"items"`
-}, error) {
+func decodeResponse(resp *http.Response) ([]config.Repository, error) {
     var data struct {
         Items []config.Repository `json:"items"`
     }
     if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
         return nil, err
     }
-    return &data, nil
+    return data.Items, nil
 }
 
 func saveToCSV(repos []config.Repository) error {
@@ -75,6 +74,16 @@ func updateBigQuery(repos []config.Repository) error {
     ctx := context.Background()
     for _, repo := range repos {
         if err := config.InsertRepositoryToBigQuery(ctx, repo); err != nil {
+            return err
+        }
+
+        history := config.RepoHistory{
+            RepoID:    repo.ID,
+            Stars:     repo.Stars,
+            CreatedAt: time.Now().Format(time.RFC3339),
+        }
+
+        if err := config.InsertRepoHistoryToBigQuery(ctx, history); err != nil {
             return err
         }
     }
