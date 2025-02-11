@@ -9,7 +9,7 @@ type Repository struct {
     gorm.Model
     Name        string `json:"name"`
     Stars       int    `json:"stargazers_count"`
-    URL         string `json:"url"`
+    URL         string `json:"html_url"`
     Description string `json:"description"`
 }
 

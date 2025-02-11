@@ -27,13 +27,15 @@ func StoreRepositories() {
         return
     }
 
-    if err := saveToCSV(repos); err != nil {
-        log.Println("Failed to save to CSV:", err)
-    }
-
     if err := updateBigQuery(repos); err != nil {
         log.Println("Failed to update BigQuery:", err)
     }
+
+    go func() {
+        if err := saveToCSV(repos); err != nil {
+            log.Println("Failed to save to CSV:", err)
+        }
+    }()
 }
 
 func decodeResponse(resp *http.Response) ([]config.Repository, error) {
@@ -72,20 +74,24 @@ func saveToCSV(repos []config.Repository) error {
 
 func updateBigQuery(repos []config.Repository) error {
     ctx := context.Background()
-    for _, repo := range repos {
-        if err := config.InsertRepositoryToBigQuery(ctx, repo); err != nil {
-            return err
-        }
 
-        history := config.RepoHistory{
+    if err := config.BatchUpsertRepositoriesToBigQuery(ctx, repos); err != nil {
+        return err
+    }
+
+    histories := make([]config.RepoHistory, 0, len(repos))
+    currentTime := time.Now().Format(time.RFC3339)
+    for _, repo := range repos {
+        histories = append(histories, config.RepoHistory{
             RepoID:    repo.ID,
             Stars:     repo.Stars,
-            CreatedAt: time.Now().Format(time.RFC3339),
-        }
-
-        if err := config.InsertRepoHistoryToBigQuery(ctx, history); err != nil {
-            return err
-        }
+            CreatedAt: currentTime,
+        })
     }
+
+    if err := config.BatchInsertRepoHistoryToBigQuery(ctx, histories); err != nil {
+        return err
+    }
+
     return nil
 }
